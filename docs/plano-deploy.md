@@ -15,7 +15,7 @@ Este plano usa o que existe em `totvs-front`, `totvs-api` e `totvs-infra` em 12/
 | Front Next.js | Azure Container Apps, Consumption, 0–1 réplica | O projeto usa `proxy.js` e rotas dinâmicas; precisa do servidor Next.js. Scale to zero reduz custo de computação sem tráfego, mas causa partida fria. |
 | API Spring Boot | Azure Container Apps, Consumption, 0–1 réplica | Executa Java e expõe HTTP. A partida fria também vale para a API. |
 | Banco | Azure Database for PostgreSQL Flexible Server, Burstable B1ms, sem HA | A API já usa JPA/PostgreSQL. É o principal custo contínuo: scale to zero dos containers não para o banco. Confirmar preço regional, cota e armazenamento mínimo antes do merge que o criar. |
-| Imagens | Azure Container Registry Standard se a franquia de 12 meses estiver ativa; Basic caso contrário | Guarda as imagens privadas dos dois serviços. O Azure for Students anuncia uma instância Standard gratuita por 12 meses para novos clientes elegíveis. Sem essa franquia, o registry tem cobrança própria mesmo quando as apps escalam a zero. |
+| Imagens | Azure Container Registry Standard | Guarda as imagens privadas dos dois serviços. A assinatura mostra franquia Standard Registry Unit de 31 unidades de dia no medidor exibido; monitorar o consumo mensal e evitar um segundo registry. |
 | Logs | Log Analytics / logs do Container Apps, retenção e volume mínimos | Diagnóstico de falhas de deploy e da aplicação; acompanhar ingestão para controlar custo. |
 
 Usar `rg-totvs-prod` e, inicialmente, `francecentral` para os recursos da aplicação. A comparação abaixo mostra que ela não é a região de menor preço de tabela, mas a economia nominal de mudar para `mexicocentral` é pequena no cenário atual. Manter `rg-totvs-tfstate` e seu Storage Account exclusivamente para o estado Terraform: arquivos enviados pelos usuários devem usar outra conta/container, quando o upload de fato existir. Não criar RabbitMQ neste primeiro lote: há dependência e serviço no `compose.yaml`, mas não há uso implementado no código atual.
@@ -36,7 +36,7 @@ Consultado em 12/09/2026 na [API oficial de preços de varejo da Azure](https://
 
 Sem franquias, Mexico Central economizaria cerca de **US$ 0,42/mês** frente a France Central nesse conjunto fixo. Isso não decide sozinho o custo total: Container Apps tem preço por uso ligeiramente maior no México, e a rede privada ainda não foi desenhada. Para o tráfego baixo previsto, a franquia mensal do Container Apps tende a cobrir o consumo, desde que outras aplicações da assinatura não a usem.
 
-Mais importante: o [Azure for Students](https://azure.microsoft.com/en-us/free/students) lista, para clientes elegíveis, **750 horas/mês de PostgreSQL B1ms com 32 GB de armazenamento e backup por 12 meses**, **um ACR Standard com 100 GB por 12 meses** e a franquia permanente do **Container Apps**. Confirmar no portal da assinatura se as franquias de 12 meses estão realmente ativas e não foram consumidas; se estiverem, usar Standard em vez de Basic e não estimar cobrança de PostgreSQL dentro dos limites. A [página de uso gratuito](https://learn.microsoft.com/en-us/azure/cost-management-billing/manage/check-free-service-usage) explica onde verificar os medidores. Não alterar a região do backend Terraform por causa dessa diferença pequena.
+Mais importante: o [Azure for Students](https://azure.microsoft.com/en-us/free/students) lista **750 horas/mês de PostgreSQL B1ms com 32 GB de armazenamento e backup por 12 meses**, **um ACR Standard com 100 GB por 12 meses** e a franquia permanente do **Container Apps**. Em 12/09/2026, o portal da assinatura do projeto mostrou os quatro medidores relevantes disponíveis e ainda sem uso: PostgreSQL B1MS 0/750 horas, armazenamento 0/32 GB-mês, backup 0/32 GB-mês e ACR Standard 0/31 dias. Portanto, planejar **um PostgreSQL B1MS de 32 GB e um ACR Standard**, com custo de tabela coberto por essas franquias enquanto permanecerem ativas e dentro dos limites. A [página de uso gratuito](https://learn.microsoft.com/en-us/azure/cost-management-billing/manage/check-free-service-usage) explica o monitoramento. Não alterar a região do backend Terraform por causa da diferença pequena de preço de tabela.
 
 ## Fluxo de entrega desejado
 
@@ -52,7 +52,7 @@ Ainda não habilitar `apply` ou deploy de aplicações: falta declarar a infraes
 - Criar Dockerfiles e testar localmente as imagens de front e API, sem alterar a lógica de negócio.
 - Declarar a primeira infraestrutura em Terraform num PR para `develop`; o check valida a sintaxe e um `plan` separado mostra recursos e custo esperado antes de qualquer `apply`.
 - Preparar workflows de build/push/deploy para `main`, condicionados à existência dos recursos e das identidades OIDC correspondentes.
-- Conferir na Azure: franquias ativas do Azure for Students, cotas e disponibilidade em `francecentral`, preço da configuração completa com rede por 2,5 meses e alertas do orçamento de US$ 80. O orçamento alerta; não funciona como desligamento automático.
+- Conferir na Azure: disponibilidade do SKU B1MS e cota dos serviços em `francecentral`, preço da configuração completa com rede por 2,5 meses e alertas do orçamento de US$ 80. Monitorar mensalmente as franquias já identificadas; o orçamento alerta, mas não funciona como desligamento automático.
 
 ## Contrato que a equipe precisa fechar antes do deploy funcional
 
@@ -67,6 +67,6 @@ Ainda não habilitar `apply` ou deploy de aplicações: falta declarar a infraes
 - [Next.js: Proxy requer servidor e não funciona em exportação estática](https://nextjs.org/docs/app/guides/self-hosting#proxy).
 - [Container Apps: scale to zero e cobrança](https://learn.microsoft.com/en-us/azure/container-apps/scale-app) e [preços do plano Consumption](https://azure.microsoft.com/en-us/pricing/details/container-apps/).
 - [PostgreSQL Flexible Server: regiões e opções de computação](https://learn.microsoft.com/en-us/azure/postgresql/flexible-server/overview) e [preços](https://azure.microsoft.com/en-us/pricing/details/postgresql/flexible-server/).
-- [Azure Container Registry Basic](https://learn.microsoft.com/en-us/azure/container-registry/container-registry-skus).
+- [Azure Container Registry: SKUs](https://learn.microsoft.com/en-us/azure/container-registry/container-registry-skus).
 - [Custos adicionais de VNet customizada no Container Apps](https://learn.microsoft.com/en-us/azure/container-apps/custom-virtual-networks).
 
