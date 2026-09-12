@@ -6,7 +6,7 @@ Este plano usa o que existe em `totvs-front`, `totvs-api` e `totvs-infra` em 12/
 
 - `main` dos três repositórios protegida por PR e pelo respectivo check de CI (`build`, `test` ou `validate`). As aprovações obrigatórias estão em zero.
 - `totvs-infra` autentica no Azure por OIDC, usa estado remoto no container `tfstate` e executa `terraform plan` na `main`. Ainda não há `terraform apply` automático.
-- A assinatura Azure for Students permite, por política, `francecentral` entre outras regiões. O backend Terraform já está nessa região. Disponibilidade e cotas de cada serviço ainda precisam ser confirmadas na assinatura antes da criação.
+- A assinatura Azure for Students permite, por política, `francecentral` entre outras regiões. O backend Terraform já está nessa região. A consulta `az postgres flexible-server list-skus --location francecentral` retornou `Standard_B1ms`; ainda é preciso confirmar cota e capacidade no momento da criação.
 
 ## Primeira arquitetura proposta
 
@@ -14,7 +14,7 @@ Este plano usa o que existe em `totvs-front`, `totvs-api` e `totvs-infra` em 12/
 | --- | --- | --- |
 | Front Next.js | Azure Container Apps, Consumption, 0–1 réplica | O projeto usa `proxy.js` e rotas dinâmicas; precisa do servidor Next.js. Scale to zero reduz custo de computação sem tráfego, mas causa partida fria. |
 | API Spring Boot | Azure Container Apps, Consumption, 0–1 réplica | Executa Java e expõe HTTP. A partida fria também vale para a API. |
-| Banco | Azure Database for PostgreSQL Flexible Server, Burstable B1ms, sem HA | A API já usa JPA/PostgreSQL. É o principal custo contínuo: scale to zero dos containers não para o banco. Confirmar preço regional, cota e armazenamento mínimo antes do merge que o criar. |
+| Banco | Azure Database for PostgreSQL Flexible Server, Burstable B1ms, sem HA | A API já usa JPA/PostgreSQL. O SKU aparece em France Central e a assinatura mostra a franquia gratuita correspondente. Scale to zero dos containers não para o banco; conferir cota, rede e armazenamento antes de criar. |
 | Imagens | Azure Container Registry Standard | Guarda as imagens privadas dos dois serviços. A assinatura mostra franquia Standard Registry Unit de 31 unidades de dia no medidor exibido; monitorar o consumo mensal e evitar um segundo registry. |
 | Logs | Log Analytics / logs do Container Apps, retenção e volume mínimos | Diagnóstico de falhas de deploy e da aplicação; acompanhar ingestão para controlar custo. |
 
@@ -52,7 +52,7 @@ Ainda não habilitar `apply` ou deploy de aplicações: falta declarar a infraes
 - Criar Dockerfiles e testar localmente as imagens de front e API, sem alterar a lógica de negócio.
 - Declarar a primeira infraestrutura em Terraform num PR para `develop`; o check valida a sintaxe e um `plan` separado mostra recursos e custo esperado antes de qualquer `apply`.
 - Preparar workflows de build/push/deploy para `main`, condicionados à existência dos recursos e das identidades OIDC correspondentes.
-- Conferir na Azure: disponibilidade do SKU B1MS e cota dos serviços em `francecentral`, preço da configuração completa com rede por 2,5 meses e alertas do orçamento de US$ 80. Monitorar mensalmente as franquias já identificadas; o orçamento alerta, mas não funciona como desligamento automático.
+- Conferir na Azure: cota e capacidade dos serviços em `francecentral`, preço da configuração completa com rede por 2,5 meses e alertas do orçamento de US$ 80. Monitorar mensalmente as franquias já identificadas; o orçamento alerta, mas não funciona como desligamento automático.
 
 ## Contrato que a equipe precisa fechar antes do deploy funcional
 
