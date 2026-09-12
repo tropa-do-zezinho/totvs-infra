@@ -6,9 +6,10 @@ O diretório `prod/` contém a configuração do backend remoto do Terraform.
 As credenciais não ficam no repositório: no Cloud Shell, o Terraform usa a
 sessão do Azure CLI; no GitHub Actions, a autenticação será feita por OIDC.
 
-O workflow atual verifica formatação e validação em `develop`, `main` e pull
-requests para `main`. Ele não executa `terraform apply` e ainda não cria os
-serviços da aplicação.
+O workflow `terraform-check.yml` verifica formatação e validação em `develop`,
+`main` e pull requests para `main`. O workflow `azure-oidc-check.yml` é manual
+e testa o acesso ao backend depois da configuração da identidade federada.
+Nenhum deles executa `terraform apply` ou cria serviços da aplicação.
 
 Próximos passos: conectar uma identidade federada ao GitHub Actions, conferir
 custos e disponibilidade dos serviços, declarar os recursos em Terraform e
