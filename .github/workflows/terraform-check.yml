@@ -1,0 +1,30 @@
+name: Terraform check
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main, develop]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: prod
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_version: 1.14.6
+      - name: Check format
+        run: terraform fmt -check -recursive
+      - name: Initialize without accessing Azure
+        run: terraform init -backend=false -input=false
+      - name: Validate
+        run: terraform validate -no-color
+
