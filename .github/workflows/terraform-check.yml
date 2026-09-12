@@ -2,7 +2,7 @@ name: Terraform check
 
 on:
   pull_request:
-    branches: [main]
+    branches: [main, develop]
   push:
     branches: [main, develop]
   workflow_dispatch:
@@ -27,4 +27,3 @@ jobs:
         run: terraform init -backend=false -input=false
       - name: Validate
         run: terraform validate -no-color
-
