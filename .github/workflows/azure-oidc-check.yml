@@ -2,6 +2,11 @@ name: Azure OIDC check
 
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "prod/**"
+      - ".github/workflows/azure-oidc-check.yml"
 
 permissions:
   contents: read
@@ -25,6 +30,7 @@ jobs:
       - uses: hashicorp/setup-terraform@v4
         with:
           terraform_version: 1.14.6
-      - name: Verify remote Terraform backend access
+      - name: Initialize remote Terraform backend
         run: terraform -chdir=prod init -input=false
-
+      - name: Plan without creating resources
+        run: terraform -chdir=prod plan -input=false -no-color -lock-timeout=5m
