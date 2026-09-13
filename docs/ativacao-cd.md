@@ -46,6 +46,43 @@ humanas podem permanecer em zero conforme o acordo da equipe. Uma falha de
 deploy depois do merge fica visível no Actions e requer correção ou rerun;
 a revisão anterior permanece disponível para rollback.
 
+## Plano autenticado da primeira implantação
+
+O [run Azure OIDC check #3](https://github.com/tropa-do-zezinho/totvs-infra/actions/runs/34773877392),
+executado na `main` no commit `3c64f3f72fb845aef7d9cf800a4cf5bef803e664`,
+concluiu o `terraform plan` com **26 criações, 0 alterações e 0 remoções**.
+Inclui os três Container Apps 0–1, PostgreSQL privado B1ms/32 GiB, ACR
+Standard, Service Bus Standard, Storage Hot LRS, Azure Files de 5 GiB,
+VNet, DNS privado, identidade gerenciada e `AcrPull`. Não houve apply.
+
+Este resultado vale para esse commit; mudanças posteriores exigem nova
+revisão do plano. O plano Terraform não calcula custo. O ambiente Container
+Apps integrado à VNet pode criar IPs públicos e load balancer gerenciados
+que são cobrados separadamente, mesmo com as réplicas em zero:
+[documentação Azure](https://learn.microsoft.com/en-us/azure/container-apps/custom-virtual-networks).
+Confirmar a estimativa na calculadora e o uso real das franquias da
+assinatura antes de ativar o PR #8.
+
+## Conferir provedores Azure antes do apply
+
+O provider Terraform está configurado para não registrar resource providers
+automaticamente. No Azure Cloud Shell, com acesso Owner à assinatura:
+
+```bash
+az account set --subscription "Azure for Students"
+for NS in Microsoft.App Microsoft.DBforPostgreSQL Microsoft.ContainerRegistry Microsoft.ServiceBus Microsoft.Storage Microsoft.Network Microsoft.ManagedIdentity Microsoft.Authorization; do
+  STATE="$(az provider show --namespace "$NS" --query registrationState -o tsv)"
+  printf '%s: %s\n' "$NS" "$STATE"
+  if [ "$STATE" != "Registered" ]; then
+    az provider register --namespace "$NS" --wait
+  fi
+done
+```
+
+Esse passo só habilita os tipos de recurso na assinatura, sem criá-los.
+Se um registro falhar por política ou permissão, resolver isso antes de
+integrar #8.
+
 ## Permissão única para o Terraform atribuir AcrPull
 
 A identidade OIDC da infra já tem `Contributor` em `rg-totvs-prod`, mas isso
