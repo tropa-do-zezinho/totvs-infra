@@ -1,4 +1,4 @@
-name: Azure OIDC check
+name: Terraform production
 
 on:
   workflow_dispatch:
@@ -12,8 +12,13 @@ permissions:
   contents: read
   id-token: write
 
+concurrency:
+  group: terraform-production
+  cancel-in-progress: false
+
 jobs:
-  verify:
+  plan-and-apply:
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     env:
       ARM_USE_OIDC: "true"
@@ -22,15 +27,42 @@ jobs:
       ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
     steps:
       - uses: actions/checkout@v7
+      - uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_version: 1.14.6
+      - name: Check format
+        run: terraform -chdir=prod fmt -check -recursive
       - uses: azure/login@v3
         with:
           client-id: ${{ vars.AZURE_CLIENT_ID }}
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
           subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
-      - uses: hashicorp/setup-terraform@v4
-        with:
-          terraform_version: 1.14.6
-      - name: Initialize remote Terraform backend
+      - name: Initialize remote state
         run: terraform -chdir=prod init -input=false
-      - name: Plan without creating resources
-        run: terraform -chdir=prod plan -input=false -no-color -lock-timeout=5m
+      - name: Validate
+        run: terraform -chdir=prod validate -no-color
+      - name: Save production plan
+        run: terraform -chdir=prod plan -input=false -no-color -lock-timeout=5m -out=tfplan
+      - name: Block deletion and replacement
+        if: github.event_name == 'push'
+        run: |
+          terraform -chdir=prod show -json tfplan > "$RUNNER_TEMP/tfplan.json"
+          python3 - "$RUNNER_TEMP/tfplan.json" <<'PY'
+          import json
+          import sys
+
+          with open(sys.argv[1], encoding="utf-8") as source:
+              plan = json.load(source)
+          destructive = [
+              item["address"]
+              for item in plan.get("resource_changes", [])
+              if "delete" in item.get("change", {}).get("actions", [])
+          ]
+          if destructive:
+              print("Terraform would delete or replace resources:")
+              print("\n".join(destructive))
+              sys.exit(1)
+          PY
+      - name: Apply reviewed main configuration
+        if: github.event_name == 'push'
+        run: terraform -chdir=prod apply -input=false -auto-approve -lock-timeout=5m tfplan
