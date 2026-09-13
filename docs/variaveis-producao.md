@@ -32,17 +32,19 @@ isso, a aplicação pode iniciar apontando para serviços locais inexistentes.
 | `AZURE_SERVICE_BUS_CONNECTION_STRING` | Regra SAS **Listen** da mesma fila | Secret. |
 | `AZURE_SERVICE_BUS_QUEUE_NAME` | `reunioes-para-analise` | Configuração; igual à API. |
 | `WORKER_ALLOWED_DOWNLOAD_HOSTS` | Host exato `<storage>.blob.core.windows.net` | Configuração; restringe URLs SAS aceitas. |
-| `WORKER_OUTPUT_DIR` | Caminho de saída **persistente e compartilhável** | Pendente: o Worker atual escreve em disco local. |
+| `WORKER_OUTPUT_DIR` | `/app/data/processed/requests`, com Azure Files montado nesse caminho | Configuração. O Dockerfile declara volume, mas o Container App precisa montar o share. |
+| `INSIGHTS_API_URL` | URL HTTPS do endpoint de ingestão da API (contrato sugerido: `/api/v1/worker/insights`) | Configuração obrigatória no modo Worker; o endpoint ainda não existe em `totvs-api/develop`. |
+| `INSIGHTS_API_TOKEN` | Token compartilhado para autenticar a entrega HTTP | Secret; a API precisa validar o Bearer token. |
 | `GROQ_API_KEY` | Chave do provedor Groq, se a etapa LLM for usada | Secret externo à Azure; sem chave o código mantém a triagem local. |
 | `LLM_MODEL`, `MAX_LLM_CALLS`, `LLM_RPM`, `LLM_MAX_RETRIES` | Defaults do `.env.example`, ajustados ao limite real da conta | Configuração, sem credenciais. |
 
 A API publica `request_id`, `file_url` e `file_name`, que correspondem ao
-contrato do Worker. O Worker só confirma a mensagem depois de gravar
-`_SUCCESS.json`. Um diretório efêmero no Container Apps perderia esse marcador
-e os resultados entre reinícios, quebrando idempotência e acesso pelo backend.
-Antes do deploy, escolher publicação dos resultados em Blob Storage ou um
-volume compartilhado acessível pela API. O repositório do Worker ainda não tem
-Dockerfile, CI ou branch `develop`.
+contrato do Worker. O Worker grava `_SUCCESS.json`, entrega `dashboard/insights.json` à API por HTTP,
+grava `_API_DELIVERED.json` e só então confirma a mensagem. Um diretório efêmero
+perderia os marcadores entre reinícios e poderia repetir a análise. O Dockerfile
+já existe; ainda faltam CI e branch `develop`. O endpoint HTTP de ingestão ainda
+não aparece em `totvs-api/develop`, portanto o fluxo completo não funciona até
+a API implementá-lo e validar o token.
 
 ## Recursos ainda necessários
 
@@ -50,8 +52,11 @@ Dockerfile, CI ou branch `develop`.
   do backend Terraform. A API atual gera SAS com chave de conta.
 - Um namespace Azure Service Bus Standard e uma fila
   `reunioes-para-analise`, com DLQ monitorada e permissões Send/Listen separadas.
-- Uma forma persistente de guardar `dashboard/insights.json` e demais saídas
-  do Worker, com contrato de leitura definido com a API.
+- Um Azure Files share pequeno montado no caminho do Worker para manter os
+  marcadores e os arquivos entre tentativas. A API receberá o JSON consolidado
+  por HTTP, não por leitura direta desse volume.
+- O endpoint HTTP de ingestão de insights na API, com autenticação por token e
+  upsert idempotente por `request_id`.
 
 A assinatura mostrou franquias de Blob Storage Hot LRS e Service Bus Standard
 ainda sem uso. Conferir o medidor e o custo efetivo da configuração antes do
