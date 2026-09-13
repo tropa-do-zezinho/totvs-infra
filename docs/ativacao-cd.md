@@ -6,40 +6,35 @@ ativação única; não contém credenciais e não cria recursos por si só.
 
 ## Ordem de ativação
 
-1. Integrar os PRs de rede/PostgreSQL (#6) e Blob/Service Bus (#7) em
-   `totvs-infra/develop`. Integrar `develop` em `main` **antes** de ativar o PR
-   de apply automático (#8). O workflow atual da `main` gera somente um plano
-   autenticado. Revisar nele SKU, região, IPs/load balancer, DNS, storage, fila,
-   cotas e medidores da assinatura.
-2. Só depois da revisão, integrar o PR #8 na `main`. Essa alteração executará
-   `plan` e `apply` automaticamente para recursos novos ou atualizações.
-   Remoções e substituições são bloqueadas pelo workflow. O orçamento Azure
-   alerta, mas não impede cobranças.
-3. Integrar o PR #9 de Container Apps em `develop` depois de #6 e #7, e então
-   em `main`. O PR #9 está empilhado sobre #6 e contém as declarações de #7
-   para validar em conjunto; ajustar sua base para `develop` após os dois
-   merges. A API `ca-totvs-api`, o frontend `ca-totvs-front` e o Worker
-   `ca-totvs-worker` começam com imagem pública temporária. Terraform injeta
-   configurações/secrets, monta Azure Files no Worker, configura escala 0–1 e
-   atribui `AcrPull` à identidade gerenciada. Os workflows de aplicação passam
-   a ser donos do campo de imagem, que Terraform ignora depois da criação.
-4. Antes do primeiro apply do PR #9, dar ao service principal da **infra**
-   permissão para criar a atribuição `AcrPull` no resource group (comando
-   abaixo). `Contributor` sozinho não cria role assignments.
-5. Criar uma identidade OIDC de **deploy das aplicações**, separada da identidade
-   `totvs-infra-main`, e atribuir `AcrPush` no registry e
-   `Container Apps Contributor` em `rg-totvs-prod`. OIDC evita client secret.
-6. Configurar as variáveis de Actions `AZURE_DEPLOY_CLIENT_ID`,
-   `AZURE_TENANT_ID` e `AZURE_SUBSCRIPTION_ID` nos três repositórios de
-   aplicação. A identidade da infra continua usando `AZURE_CLIENT_ID`.
+1. Integrar #6 (rede/PostgreSQL), #7 (Blob/Service Bus) e #9 (Container
+   Apps) em `totvs-infra/develop`, nessa ordem. O PR #9 é acumulado e contém
+   as mesmas declarações de #6 e #7 enquanto eles não chegam a `develop`;
+   a comparação encolhe após cada merge. O PR #8 continua fora da `main`.
+2. Integrar `develop` em `main` **antes** de ativar #8. O workflow atual
+   da `main` gera só um plano autenticado. Revisar o plano completo: SKU,
+   região, IPs/load balancer, DNS, storage, fila, Container Apps, cotas,
+   atribuição `AcrPull` e medidores. Nenhum recurso é aplicado nessa fase.
+3. Dar à identidade OIDC da infra permissão para criar `AcrPull` no
+   `rg-totvs-prod` (comando abaixo). `Contributor` sozinho não pode criar
+   role assignments. Fazer isso antes da primeira execução de apply.
+4. Após aceitar o plano e o custo estimado, integrar #8 em `develop` e
+   depois em `main`. O push na `main` executará `plan` e `apply` do plano
+   salvo automaticamente. Remoções e substituições são bloqueadas. O orçamento
+   Azure alerta, mas não interrompe cobranças. Os três Container Apps
+   inicialmente terão uma imagem pública temporária e escala 0–1.
+5. Com ACR e Container Apps criados, criar uma identidade OIDC de **deploy
+   das aplicações**, separada da identidade do Terraform, com `AcrPush` no
+   registry e `Container Apps Contributor` em `rg-totvs-prod`.
+6. Configurar as Actions variables `AZURE_DEPLOY_CLIENT_ID`,
+   `AZURE_TENANT_ID` e `AZURE_SUBSCRIPTION_ID` nos três repositórios
+   de aplicação. A identidade da infra continua usando `AZURE_CLIENT_ID`.
 7. Integrar os PRs de deploy da API, frontend e Worker em `develop`, depois
-   seguir o fluxo normal de PR para `main`. O merge em `main` testa, constrói
-   imagem com a tag do commit, envia ao ACR e atualiza somente o Container App
-   correspondente. Se o código já estiver na `main` depois da criação dos
-   Container Apps, executar `workflow_dispatch` uma vez em cada repositório;
-   os merges seguintes publicam automaticamente. O frontend obtém o FQDN da API no momento do build;
-   `NEXT_PUBLIC_API_URL` e `NEXT_PUBLIC_WS_URL` podem sobrescrever os URLs
-   gerados quando o contrato do projeto for fechado.
+   seguir o fluxo normal de PR para `main`. O merge em `main` testa,
+   constrói imagem com a tag do commit, envia ao ACR e atualiza somente o
+   Container App correspondente. Se o código já estava na `main`, executar
+   `workflow_dispatch` uma vez em cada repositório. O frontend obtém o FQDN
+   da API no build; `NEXT_PUBLIC_API_URL` e `NEXT_PUBLIC_WS_URL` podem
+   sobrescrever os URLs quando o contrato do produto for fechado.
 
 A `main` de cada repositório deve exigir os checks `test` e `image` (API),
 `build` e `image` (frontend), `validate` (Worker e infra). Aprovações humanas
