@@ -64,8 +64,8 @@ resource "azurerm_private_dns_zone_virtual_network_link" "postgres" {
   registration_enabled = false
 }
 
-# Both application containers will share this external environment.
-# No persistent log destination is set until its ingestion cost is reviewed.
+# All application containers share this external environment and send console
+# and platform logs to the bounded Log Analytics workspace.
 resource "azurerm_container_app_environment" "prod" {
   name                           = "cae-totvs-prod"
   location                       = local.app_location
@@ -73,6 +73,7 @@ resource "azurerm_container_app_environment" "prod" {
   infrastructure_subnet_id       = azurerm_subnet.container_apps.id
   internal_load_balancer_enabled = false
   zone_redundancy_enabled        = false
+  log_analytics_workspace_id     = azurerm_log_analytics_workspace.prod.id
 
   workload_profile {
     name                  = "Consumption"
