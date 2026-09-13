@@ -36,10 +36,14 @@ ativação única; não contém credenciais e não cria recursos por si só.
    da API no build; `NEXT_PUBLIC_API_URL` e `NEXT_PUBLIC_WS_URL` podem
    sobrescrever os URLs quando o contrato do produto for fechado.
 
-A `main` de cada repositório deve exigir os checks `test` e `image` (API),
-`build` e `image` (frontend), `validate` (Worker e infra). Aprovações humanas
-obrigatórias podem permanecer em zero conforme o acordo da equipe. Uma falha
-de deploy depois do merge fica visível no Actions e requer correção ou rerun;
+Nos rulesets atuais, `totvs-infra/main` exige `validate`, `totvs-api/main`
+exige `test` e `totvs-front/main` exige `build`. Acrescentar `image` aos
+checks obrigatórios da API e do frontend para impedir merge com imagem
+quebrada. O repositório Worker está privado e a API de rulesets respondeu
+`403` com exigência de GitHub Pro ou repositório público; sua CI roda, mas a
+proteção obrigatória da `main` precisa esperar uma dessas opções. Aprovações
+humanas podem permanecer em zero conforme o acordo da equipe. Uma falha de
+deploy depois do merge fica visível no Actions e requer correção ou rerun;
 a revisão anterior permanece disponível para rollback.
 
 ## Permissão única para o Terraform atribuir AcrPull
