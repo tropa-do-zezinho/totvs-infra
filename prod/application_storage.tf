@@ -34,3 +34,17 @@ output "meetings_container_name" {
   description = "Private upload container."
   value       = azurerm_storage_container.meetings.name
 }
+
+# The Worker needs durable checkpoints and delivery markers across revisions.
+# Mount this share at /app/data/processed/requests when its Container App is defined.
+resource "azurerm_storage_share" "worker_checkpoints" {
+  name               = "worker-checkpoints"
+  storage_account_id = azurerm_storage_account.application.id
+  quota              = 5
+  enabled_protocol   = "SMB"
+}
+
+output "worker_checkpoint_share_name" {
+  description = "Azure Files share for the Worker's durable output directory."
+  value       = azurerm_storage_share.worker_checkpoints.name
+}
