@@ -15,21 +15,29 @@ ativação única; não contém credenciais e não cria recursos por si só.
    `plan` e `apply` automaticamente para recursos novos ou atualizações.
    Remoções e substituições são bloqueadas pelo workflow. O orçamento Azure
    alerta, mas não impede cobranças.
-3. Declarar os três Container Apps no Terraform e aplicar pela `main`: API
-   `ca-totvs-api`, frontend `ca-totvs-front` e Worker `ca-totvs-worker`.
-   Configurar secrets no Container App, Azure Files no Worker, escala e
-   identidade de leitura do ACR. O Terraform deve ignorar somente a tag da
-   imagem, que os workflows de cada aplicação atualizam.
-4. Criar uma identidade OIDC de **deploy das aplicações**, separada da identidade
+3. Integrar o PR #9 de Container Apps em `develop` depois de #6 e #7, e então
+   em `main`. O PR #9 está empilhado sobre #6 e contém as declarações de #7
+   para validar em conjunto; ajustar sua base para `develop` após os dois
+   merges. A API `ca-totvs-api`, o frontend `ca-totvs-front` e o Worker
+   `ca-totvs-worker` começam com imagem pública temporária. Terraform injeta
+   configurações/secrets, monta Azure Files no Worker, configura escala 0–1 e
+   atribui `AcrPull` à identidade gerenciada. Os workflows de aplicação passam
+   a ser donos do campo de imagem, que Terraform ignora depois da criação.
+4. Antes do primeiro apply do PR #9, dar ao service principal da **infra**
+   permissão para criar a atribuição `AcrPull` no resource group (comando
+   abaixo). `Contributor` sozinho não cria role assignments.
+5. Criar uma identidade OIDC de **deploy das aplicações**, separada da identidade
    `totvs-infra-main`, e atribuir `AcrPush` no registry e
    `Container Apps Contributor` em `rg-totvs-prod`. OIDC evita client secret.
-5. Configurar as variáveis de Actions `AZURE_DEPLOY_CLIENT_ID`,
+6. Configurar as variáveis de Actions `AZURE_DEPLOY_CLIENT_ID`,
    `AZURE_TENANT_ID` e `AZURE_SUBSCRIPTION_ID` nos três repositórios de
    aplicação. A identidade da infra continua usando `AZURE_CLIENT_ID`.
-6. Integrar os PRs de deploy da API, frontend e Worker em `develop`, depois
+7. Integrar os PRs de deploy da API, frontend e Worker em `develop`, depois
    seguir o fluxo normal de PR para `main`. O merge em `main` testa, constrói
    imagem com a tag do commit, envia ao ACR e atualiza somente o Container App
-   correspondente. O frontend obtém o FQDN da API no momento do build;
+   correspondente. Se o código já estiver na `main` depois da criação dos
+   Container Apps, executar `workflow_dispatch` uma vez em cada repositório;
+   os merges seguintes publicam automaticamente. O frontend obtém o FQDN da API no momento do build;
    `NEXT_PUBLIC_API_URL` e `NEXT_PUBLIC_WS_URL` podem sobrescrever os URLs
    gerados quando o contrato do projeto for fechado.
 
@@ -38,6 +46,27 @@ A `main` de cada repositório deve exigir os checks `test` e `image` (API),
 obrigatórias podem permanecer em zero conforme o acordo da equipe. Uma falha
 de deploy depois do merge fica visível no Actions e requer correção ou rerun;
 a revisão anterior permanece disponível para rollback.
+
+## Permissão única para o Terraform atribuir AcrPull
+
+A identidade OIDC da infra já tem `Contributor` em `rg-totvs-prod`, mas isso
+não cobre `Microsoft.Authorization/roleAssignments/write`. Antes do apply que
+cria os Container Apps, um Owner da assinatura deve executar no Cloud Shell:
+
+```bash
+az account set --subscription "Azure for Students"
+RG_ID="$(az group show --name rg-totvs-prod --query id -o tsv)"
+az role assignment create \
+  --assignee-object-id 237fb302-404e-4651-b2b8-7ca2731bbbca \
+  --assignee-principal-type ServicePrincipal \
+  --role "Role Based Access Control Administrator" \
+  --scope "$RG_ID"
+```
+
+Esse papel permite gerenciar atribuições de acesso no resource group, então
+limite o escopo ao `rg-totvs-prod` e revise as mudanças de IAM no Terraform.
+Depois do bootstrap, confira o papel no IAM do grupo e nunca exponha tokens
+ou senhas no repositório.
 
 ## OIDC das aplicações — preparação para Azure Cloud Shell
 
