@@ -4,7 +4,7 @@ Este plano usa `totvs-front`, `totvs-api/develop`, `totvs-infra` e `Worker-Chall
 
 ## O que já está pronto
 
-- `main` dos três repositórios iniciais é protegida por PR e pelo respectivo check de CI (`build`, `test` ou `validate`). As aprovações obrigatórias estão em zero. O novo Worker ainda tem apenas `main`, sem CI ou branch `develop`; o Dockerfile já existe.
+- `main` dos três repositórios iniciais é protegida por PR e pelo respectivo check de CI (`build`, `test` ou `validate`). As aprovações obrigatórias estão em zero. O Worker já tem `develop`, Dockerfile e CI; o workflow de deploy está proposto no PR #2 do Worker.
 - `totvs-infra` autentica no Azure por OIDC, usa estado remoto no container `tfstate` e executa `terraform plan` na `main`. Ainda não há `terraform apply` automático.
 - A assinatura Azure for Students permite, por política, `francecentral` entre outras regiões. O backend Terraform já está nessa região. A consulta `az postgres flexible-server list-skus --location francecentral` retornou `Standard_B1ms`; ainda é preciso confirmar cota e capacidade no momento da criação.
 
@@ -44,11 +44,11 @@ Mais importante: o [Azure for Students](https://azure.microsoft.com/en-us/free/s
 ## Fluxo de entrega desejado
 
 1. PR para `main` roda o check obrigatório. `develop` continua sem deploy.
-2. Merge de código da aplicação em `main` constrói uma imagem com tag imutável do commit, envia ao registry e atualiza a revisão do Container App correspondente. O Worker também precisará de Dockerfile, CI e branch `develop` para seguir o mesmo fluxo.
-3. Merge de Terraform em `main` executa `plan` e, quando o primeiro lote estiver revisado e habilitado, `apply`. A identidade OIDC atual só confia no `totvs-infra/main`; front, API e Worker precisarão de credenciais federadas próprias para os respectivos workflows de deploy, com permissões limitadas.
+2. Merge de código da aplicação em `main` constrói uma imagem com tag imutável do commit, envia ao registry e atualiza a revisão do Container App correspondente. O Worker já tem Dockerfile, CI e `develop`; o PR #2 propõe a publicação na `main`.
+3. Merge de Terraform em `main` executa `plan` e, quando o primeiro lote estiver revisado e habilitado, `apply`. A identidade OIDC atual só confia no `totvs-infra/main`; front, API e Worker usarão uma identidade OIDC de deploy separada, com permissões limitadas de ACR e Container Apps. O bootstrap está documentado em `docs/ativacao-cd.md` no PR #8.
 4. Os workflows devem falhar visivelmente se build, push ou atualização da revisão falharem. Não registrar segredos em logs, arquivos versionados ou parâmetros públicos de build.
 
-Ainda não habilitar `apply` ou deploy de aplicações: faltam revisar Storage e Service Bus da aplicação, verificar custo/cota, preparar as imagens e montar volume persistente para os checkpoints do Worker. O endpoint HTTP de ingestão ainda não existe na API. Isso preserva o acordo de que, **quando o pipeline estiver pronto**, merge em `main` publica automaticamente.
+Ainda não habilitar `apply` ou deploy de aplicações: é preciso revisar o plano e o custo, criar os Container Apps, configurar OIDC e montar o volume persistente para os checkpoints do Worker. O endpoint HTTP de ingestão ainda não existe na API. Isso preserva o acordo de que, **quando o pipeline estiver pronto**, merge em `main` publica automaticamente.
 
 ## Trabalho que pode começar agora, sem esperar novos repositórios
 
