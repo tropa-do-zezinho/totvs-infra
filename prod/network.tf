@@ -58,10 +58,10 @@ resource "azurerm_private_dns_zone" "postgres" {
 }
 
 resource "azurerm_private_dns_zone_virtual_network_link" "postgres" {
-  name                  = "link-vnet-totvs-prod"
-  private_dns_zone_id   = azurerm_private_dns_zone.postgres.id
-  virtual_network_id    = azurerm_virtual_network.prod.id
-  registration_enabled  = false
+  name                 = "link-vnet-totvs-prod"
+  private_dns_zone_id  = azurerm_private_dns_zone.postgres.id
+  virtual_network_id   = azurerm_virtual_network.prod.id
+  registration_enabled = false
 }
 
 # Both application containers will share this external environment.
