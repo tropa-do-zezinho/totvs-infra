@@ -4,7 +4,7 @@ Este plano usa `totvs-front`, `totvs-api/develop`, `totvs-infra` e `Worker-Chall
 
 ## O que já está pronto
 
-- `main` dos três repositórios iniciais é protegida por PR e pelo respectivo check de CI (`build`, `test` ou `validate`). As aprovações obrigatórias estão em zero. O novo Worker ainda tem apenas `main`, sem CI, Dockerfile ou branch `develop`.
+- `main` dos três repositórios iniciais é protegida por PR e pelo respectivo check de CI (`build`, `test` ou `validate`). As aprovações obrigatórias estão em zero. O novo Worker ainda tem apenas `main`, sem CI ou branch `develop`; o Dockerfile já existe.
 - `totvs-infra` autentica no Azure por OIDC, usa estado remoto no container `tfstate` e executa `terraform plan` na `main`. Ainda não há `terraform apply` automático.
 - A assinatura Azure for Students permite, por política, `francecentral` entre outras regiões. O backend Terraform já está nessa região. A consulta `az postgres flexible-server list-skus --location francecentral` retornou `Standard_B1ms`; ainda é preciso confirmar cota e capacidade no momento da criação.
 
@@ -14,7 +14,7 @@ Este plano usa `totvs-front`, `totvs-api/develop`, `totvs-infra` e `Worker-Chall
 | --- | --- | --- |
 | Front Next.js | Azure Container Apps, Consumption, 0–1 réplica | O projeto usa `proxy.js` e rotas dinâmicas; precisa do servidor Next.js. Scale to zero reduz custo de computação sem tráfego, mas causa partida fria. |
 | API Spring Boot | Azure Container Apps, Consumption, 0–1 réplica | Executa Java, upload e publicação no Service Bus. A partida fria também vale para a API. |
-| Worker Python | Azure Container Apps, perfil Consumption | Consome a fila e processa arquivos. O código atual faz polling contínuo; escala, imagem e persistência precisam ser acertadas antes do deploy. |
+| Worker Python | Azure Container Apps, perfil Consumption | Consome a fila, processa arquivos e envia insights à API por HTTP. O Dockerfile existe; escala e volume para checkpoint precisam ser acertados antes do deploy. |
 | Upload | Storage Account Hot LRS e container privado `reunioes` | A API já envia Blob e gera SAS. Usar conta separada do estado Terraform. |
 | Mensageria | Azure Service Bus Standard, fila `reunioes-para-analise` | A API publica e o Worker consome. A assinatura mostra franquia de 750 horas do Standard. |
 | Banco | Azure Database for PostgreSQL Flexible Server, Burstable B1ms, sem HA | A API já usa JPA/PostgreSQL. O SKU aparece em France Central e a assinatura mostra a franquia gratuita correspondente. Scale to zero dos containers não para o banco; conferir cota, rede e armazenamento antes de criar. |
@@ -48,11 +48,11 @@ Mais importante: o [Azure for Students](https://azure.microsoft.com/en-us/free/s
 3. Merge de Terraform em `main` executa `plan` e, quando o primeiro lote estiver revisado e habilitado, `apply`. A identidade OIDC atual só confia no `totvs-infra/main`; front, API e Worker precisarão de credenciais federadas próprias para os respectivos workflows de deploy, com permissões limitadas.
 4. Os workflows devem falhar visivelmente se build, push ou atualização da revisão falharem. Não registrar segredos em logs, arquivos versionados ou parâmetros públicos de build.
 
-Ainda não habilitar `apply` ou deploy de aplicações: faltam Storage e Service Bus da aplicação, verificar custo/cota, preparar as imagens e persistir a saída do Worker. Isso preserva o acordo de que, **quando o pipeline estiver pronto**, merge em `main` publica automaticamente.
+Ainda não habilitar `apply` ou deploy de aplicações: faltam revisar Storage e Service Bus da aplicação, verificar custo/cota, preparar as imagens e montar volume persistente para os checkpoints do Worker. O endpoint HTTP de ingestão ainda não existe na API. Isso preserva o acordo de que, **quando o pipeline estiver pronto**, merge em `main` publica automaticamente.
 
 ## Trabalho que pode começar agora, sem esperar novos repositórios
 
-- Criar Dockerfiles e testar localmente as imagens de front, API e Worker, sem alterar a lógica de negócio.
+- Criar/testar as imagens de front e API e validar o Dockerfile já existente do Worker, sem alterar a lógica de negócio.
 - Declarar a primeira infraestrutura em Terraform num PR para `develop`; o check valida a sintaxe e um `plan` separado mostra recursos e custo esperado antes de qualquer `apply`.
 - Preparar workflows de build/push/deploy para `main`, condicionados à existência dos recursos e das identidades OIDC correspondentes.
 - Conferir na Azure: cota e capacidade dos serviços em `francecentral`, preço da configuração completa com rede por 2,5 meses e alertas do orçamento de US$ 80. Monitorar mensalmente as franquias já identificadas; o orçamento alerta, mas não funciona como desligamento automático.
@@ -63,7 +63,7 @@ Ainda não habilitar `apply` ou deploy de aplicações: faltam Storage e Service
 - **2FA e WebSocket:** o front chama rotas de 2FA e `/ws/jobs/{id}`; essas rotas ainda não aparecem na API atual. Definir se farão parte da entrega inicial.
 - **Upload:** a API já implementa upload em Blob e gera SAS. Provisionar Storage de aplicação separado do `tfstate`, com container `reunioes`, e configurar a credencial no Container App.
 - **Mensageria:** a API publica no Service Bus e o Worker consome o mesmo contrato JSON. Configurar a fila `reunioes-para-analise` nos dois serviços e credenciais Send/Listen separadas. O default atual da API (`meet-process`) difere do Worker.
-- **Saída do Worker:** hoje os JSONs e `_SUCCESS.json` ficam em disco local. Escolher armazenamento persistente e integração de leitura pela API antes de usar escala a zero.
+- **Saída do Worker:** o Worker grava `_SUCCESS.json`, envia `insights.json` à API por HTTP e marca `_API_DELIVERED.json` antes de confirmar a fila. Montar volume persistente para idempotência; implementar na API o endpoint de ingestão sugerido em `docs/CONTRATO_API_INSIGHTS.md` do Worker, com autenticação e upsert.
 - **Configuração de produção:** definir os overrides de PostgreSQL, JWT, Blob e Service Bus na API e Service Bus, Groq opcional e diretório de saída no Worker. Ver [variáveis de produção](variaveis-producao.md). Os valores secretos não devem ficar em `application.properties` nem no repositório.
 
 ## Referências
