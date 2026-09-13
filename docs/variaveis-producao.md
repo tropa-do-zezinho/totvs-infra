@@ -42,7 +42,7 @@ A API publica `request_id`, `file_url` e `file_name`, que correspondem ao
 contrato do Worker. O Worker grava `_SUCCESS.json`, entrega `dashboard/insights.json` à API por HTTP,
 grava `_API_DELIVERED.json` e só então confirma a mensagem. Um diretório efêmero
 perderia os marcadores entre reinícios e poderia repetir a análise. O Dockerfile
-já existe; ainda faltam CI e branch `develop`. O endpoint HTTP de ingestão ainda
+já existe; a branch `develop` foi criada e a CI está proposta no PR #1 do Worker. O endpoint HTTP de ingestão ainda
 não aparece em `totvs-api/develop`, portanto o fluxo completo não funciona até
 a API implementá-lo e validar o token.
 
@@ -52,7 +52,7 @@ a API implementá-lo e validar o token.
   do backend Terraform. A API atual gera SAS com chave de conta.
 - Um namespace Azure Service Bus Standard e uma fila
   `reunioes-para-analise`, com DLQ monitorada e permissões Send/Listen separadas.
-- Um Azure Files share pequeno montado no caminho do Worker para manter os
+- Um Azure Files share pequeno, declarado no PR #7 de infra, montado no caminho do Worker para manter os
   marcadores e os arquivos entre tentativas. A API receberá o JSON consolidado
   por HTTP, não por leitura direta desse volume.
 - O endpoint HTTP de ingestão de insights na API, com autenticação por token e
