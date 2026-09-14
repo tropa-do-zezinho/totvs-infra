@@ -10,6 +10,7 @@ resource "azurerm_postgresql_flexible_server" "prod" {
   name                          = "pgtotvs${substr(replace(data.azurerm_client_config.current.subscription_id, "-", ""), 0, 12)}"
   resource_group_name           = data.azurerm_resource_group.prod.name
   location                      = local.app_location
+  zone                          = "1"
   version                       = "16"
   sku_name                      = "B_Standard_B1ms"
   storage_mb                    = 32768
