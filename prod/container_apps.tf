@@ -330,6 +330,87 @@ resource "azurerm_container_app" "worker" {
         value = "/app/data/processed/requests"
       }
 
+      # The Groq key is set as a Container App secret outside Terraform.
+      env {
+        name        = "GROQ_API_KEY"
+        secret_name = "groq-api-key"
+      }
+
+      env {
+        name  = "LLM_MODEL"
+        value = "openai/gpt-oss-120b"
+      }
+
+      env {
+        name  = "MAX_LLM_CALLS"
+        value = "1"
+      }
+
+      env {
+        name  = "LLM_RPM"
+        value = "2"
+      }
+
+      env {
+        name  = "LLM_MAX_RETRIES"
+        value = "4"
+      }
+
+      env {
+        name  = "LLM_REASONING_EFFORT"
+        value = "low"
+      }
+
+      env {
+        name  = "LLM_MAX_OUTPUT_TOKENS"
+        value = "1536"
+      }
+
+      env {
+        name  = "RAG_TOP_K"
+        value = "3"
+      }
+
+      env {
+        name  = "WORKER_MAX_FILE_MB"
+        value = "100"
+      }
+
+      env {
+        name  = "WORKER_DOWNLOAD_TIMEOUT_SECONDS"
+        value = "120"
+      }
+
+      env {
+        name  = "WORKER_RECEIVE_WAIT_SECONDS"
+        value = "20"
+      }
+
+      env {
+        name  = "WORKER_MAX_LOCK_RENEWAL_SECONDS"
+        value = "3600"
+      }
+
+      env {
+        name  = "WORKER_MAX_DELIVERY_COUNT"
+        value = "3"
+      }
+
+      env {
+        name  = "INSIGHTS_API_TIMEOUT_SECONDS"
+        value = "60"
+      }
+
+      env {
+        name  = "INSIGHTS_API_MAX_RETRIES"
+        value = "3"
+      }
+
+      env {
+        name  = "INSIGHTS_API_RETRY_BASE_SECONDS"
+        value = "2"
+      }
+
       env {
         name  = "INSIGHTS_API_URL"
         value = "https://${azurerm_container_app.api.ingress[0].fqdn}/api/v1/worker/insights"
@@ -348,7 +429,7 @@ resource "azurerm_container_app" "worker" {
   }
 
   lifecycle {
-    ignore_changes = [template[0].container[0].image]
+    ignore_changes = [secret, template[0].container[0].image]
   }
 
   depends_on = [azurerm_role_assignment.acr_pull]
