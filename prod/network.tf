@@ -73,6 +73,7 @@ resource "azurerm_container_app_environment" "prod" {
   infrastructure_subnet_id       = azurerm_subnet.container_apps.id
   internal_load_balancer_enabled = false
   zone_redundancy_enabled        = false
+  logs_destination               = "log-analytics"
   log_analytics_workspace_id     = azurerm_log_analytics_workspace.prod.id
 
   workload_profile {
