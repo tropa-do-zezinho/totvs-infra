@@ -227,6 +227,11 @@ resource "azurerm_container_app" "front" {
       image  = "mcr.microsoft.com/azuredocs/containerapps-helloworld:latest"
       cpu    = 0.5
       memory = "1Gi"
+
+      env {
+        name  = "API_BASE_URL"
+        value = "https://${azurerm_container_app.api.ingress[0].fqdn}"
+      }
     }
   }
 
