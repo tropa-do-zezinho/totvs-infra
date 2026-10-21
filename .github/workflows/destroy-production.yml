@@ -1,0 +1,52 @@
+name: Destroy Azure production
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "teardown/DESTROY_PRODUCTION"
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: terraform-production
+  cancel-in-progress: false
+
+jobs:
+  destroy:
+    runs-on: ubuntu-latest
+    env:
+      ARM_USE_OIDC: "true"
+      ARM_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+      ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+      ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: Confirm authorized teardown marker
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(tr -d '\r\n' < teardown/DESTROY_PRODUCTION)" = "destroy-rg-totvs-prod-2026-10-21"
+      - uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_version: 1.14.6
+      - uses: azure/login@v3
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Initialize remote state
+        run: terraform -chdir=prod init -input=false
+      - name: Create destruction plan
+        run: terraform -chdir=prod plan -destroy -input=false -no-color -lock-timeout=5m -out=destroy.tfplan
+      - name: Destroy all Terraform-managed production resources
+        run: terraform -chdir=prod apply -input=false -auto-approve -lock-timeout=5m destroy.tfplan
+      - name: Verify production has no billable resources
+        shell: bash
+        run: |
+          set -euo pipefail
+          remaining="$(az resource list --resource-group rg-totvs-prod --query 'length(@)' --output tsv)"
+          echo "Remaining Azure resources in rg-totvs-prod: $remaining"
+          test "$remaining" = "0"
